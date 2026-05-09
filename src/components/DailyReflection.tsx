@@ -16,9 +16,9 @@ type ReflectionData = {
   growth: string[]
 }
 
-export default function DailyReflection() {
+export default function DailyReflection({ initialUser = 'yumin' }: { initialUser?: 'yumin' | 'sangyuan' }) {
   const [date, setDate] = useState<Date>(new Date())
-  const [currentUser, setCurrentUser] = useState<'yumin' | 'sangyuan'>('yumin')
+  const [currentUser, setCurrentUser] = useState<'yumin' | 'sangyuan'>(initialUser)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState<'yumin' | 'sangyuan' | null>(null)
   const [data, setData] = useState<Record<'yumin' | 'sangyuan', ReflectionData>>({
