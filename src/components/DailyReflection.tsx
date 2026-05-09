@@ -124,6 +124,10 @@ function UserCard({
     setEditConfig(prev => ({ ...prev, [cat]: { ...prev[cat], title } }))
   }
 
+  const updateCategoryIcon = (cat: CategoryKey, icon: string) => {
+    setEditConfig(prev => ({ ...prev, [cat]: { ...prev[cat], icon } }))
+  }
+
   const updateItem = (cat: CategoryKey, index: number, value: string) => {
     setEditConfig(prev => {
       const items = [...prev[cat].items]
@@ -250,7 +254,22 @@ function UserCard({
               fontSize: '17px', fontWeight: 700, margin: '0 0 14px 0',
               display: 'flex', alignItems: 'center', gap: '10px', color: '#FFFFFF',
             }}>
-              <span style={{ fontSize: '20px' }}>{display.icon}</span>
+              {editMode ? (
+                <input
+                  value={editConfig[cat].icon}
+                  onChange={e => updateCategoryIcon(cat, e.target.value)}
+                  style={{
+                    width: '44px', background: '#1E1F2E',
+                    border: `1px solid ${cfg.primary}88`,
+                    borderRadius: '8px', color: '#FFF',
+                    fontSize: '18px', textAlign: 'center',
+                    padding: '4px 4px', fontFamily: 'inherit',
+                    outline: 'none', flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: '20px' }}>{display.icon}</span>
+              )}
               {editMode ? (
                 <input
                   value={editConfig[cat].title}
