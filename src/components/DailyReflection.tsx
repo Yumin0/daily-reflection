@@ -8,7 +8,7 @@ import { zhCN } from 'date-fns/locale'
 type ReflectionData = {
   id?: string
   date: string
-  user: 'yumi' | 'sangyuan'
+  user: 'me' | 'bf'
   score: number
   diet: string[]
   work: string[]
