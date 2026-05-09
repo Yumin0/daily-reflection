@@ -1,7 +1,5 @@
+import DailyReflection from '@/components/DailyReflection'
+
 export default function Home() {
-  return (
-    <main>
-      <div>Hello world!</div>
-    </main>
-  );
+  return <DailyReflection />
 }

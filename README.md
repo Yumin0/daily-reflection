@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 日常反思表單應用 (Daily Reflection Form)
+
+一個簡潔美觀的日常反思記錄應用，幫助你每天反思生活的四個方面：飲食、工作、休閒和自我成長。
 
 ## Getting Started
 
