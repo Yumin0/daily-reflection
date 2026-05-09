@@ -502,10 +502,18 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
       .from('reflections').select('id')
       .eq('date', dateStr).eq('user', userKey).maybeSingle()
     const payload = { ...ud, date: dateStr, user: userKey }
+    let saveError = null
     if (existing) {
-      await supabase.from('reflections').update(payload).eq('id', existing.id)
+      const { error } = await supabase.from('reflections').update(payload).eq('id', existing.id)
+      saveError = error
     } else {
-      await supabase.from('reflections').insert([payload])
+      const { error } = await supabase.from('reflections').insert([payload])
+      saveError = error
+    }
+    if (saveError) {
+      alert(`儲存失敗：${saveError.message}`)
+      setLoading(false)
+      return
     }
     setSaved(userKey)
     setLoading(false)
