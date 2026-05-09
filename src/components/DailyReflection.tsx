@@ -8,6 +8,7 @@ import { zhCN } from 'date-fns/locale'
 type ReflectionData = {
   id?: string
   date: string
+  user: 'yumi' | 'sangyuan'
   score: number
   diet: string[]
   work: string[]
@@ -17,16 +18,28 @@ type ReflectionData = {
 
 export default function DailyReflection() {
   const [date, setDate] = useState<Date>(new Date())
-  const [score, setScore] = useState(3)
+  const [currentUser, setCurrentUser] = useState<'me' | 'bf'>('me')
   const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [data, setData] = useState<ReflectionData>({
-    date: format(new Date(), 'yyyy-MM-dd'),
-    score: 3,
-    diet: [],
-    work: [],
-    rest: [],
-    growth: [],
+  const [saved, setSaved] = useState<'me' | 'bf' | null>(null)
+  const [data, setData] = useState<Record<'me' | 'bf', ReflectionData>>({
+    me: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      user: 'me',
+      score: 3,
+      diet: [],
+      work: [],
+      rest: [],
+      growth: [],
+    },
+    bf: {
+      date: format(new Date(), 'yyyy-MM-dd'),
+      user: 'bf',
+      score: 3,
+      diet: [],
+      work: [],
+      rest: [],
+      growth: [],
+    },
   })
 
   const dietItems = ['高蛋白質早餐', '喝夠4000cc的水', '有吃到蔬菜', '額外進食加工食品', '完全無飲食習慣']
@@ -42,60 +55,65 @@ export default function DailyReflection() {
 
   const loadData = async () => {
     setLoading(true)
-    const { data: record } = await supabase
-      .from('reflections')
-      .select('*')
-      .eq('date', dateStr)
-      .single()
-
-    if (record) {
-      setData(record)
-      setScore(record.score)
-    } else {
-      setData({
-        date: dateStr,
-        score: 3,
-        diet: [],
-        work: [],
-        rest: [],
-        growth: [],
-      })
-      setScore(3)
+    const users: ('me' | 'bf')[] = ['me', 'bf']
+    const newData: Record<'me' | 'bf', ReflectionData> = {
+      me: { date: dateStr, user: 'me', score: 3, diet: [], work: [], rest: [], growth: [] },
+      bf: { date: dateStr, user: 'bf', score: 3, diet: [], work: [], rest: [], growth: [] },
     }
+
+    for (const user of users) {
+      const { data: record } = await supabase
+        .from('reflections')
+        .select('*')
+        .eq('date', dateStr)
+        .eq('user', user)
+        .maybeSingle()
+
+      if (record) {
+        newData[user] = record
+      }
+    }
+
+    setData(newData)
+    setSaved(null)
     setLoading(false)
-    setSaved(false)
   }
 
-  const handleCheckbox = (category: keyof Omit<ReflectionData, 'id' | 'date' | 'score'>, item: string) => {
+  const handleCheckbox = (category: keyof Omit<ReflectionData, 'id' | 'date' | 'user' | 'score'>, item: string) => {
     setData(prev => {
-      const items = prev[category]
-      if (items.includes(item)) {
-        return { ...prev, [category]: items.filter(i => i !== item) }
-      } else {
-        return { ...prev, [category]: [...items, item] }
+      const userData = prev[currentUser]
+      const items = userData[category]
+      return {
+        ...prev,
+        [currentUser]: {
+          ...userData,
+          [category]: items.includes(item) ? items.filter(i => i !== item) : [...items, item],
+        },
       }
     })
   }
 
   const handleSave = async () => {
     setLoading(true)
+    const userData = data[currentUser]
     const { data: existing } = await supabase
       .from('reflections')
       .select('id')
       .eq('date', dateStr)
-      .single()
+      .eq('user', currentUser)
+      .maybeSingle()
 
-    const payload = { ...data, date: dateStr, score }
+    const payload = { ...userData, date: dateStr, user: currentUser }
 
     if (existing) {
-      await supabase.from('reflections').update(payload).eq('date', dateStr)
+      await supabase.from('reflections').update(payload).eq('id', existing.id)
     } else {
       await supabase.from('reflections').insert([payload])
     }
 
-    setSaved(true)
+    setSaved(currentUser)
     setLoading(false)
-    setTimeout(() => setSaved(false), 2000)
+    setTimeout(() => setSaved(null), 2000)
   }
 
   return (
@@ -123,18 +141,46 @@ export default function DailyReflection() {
           <button onClick={() => setDate(addDays(date, 1))} className="text-2xl">›</button>
         </div>
 
+        {/* User Selection Tabs */}
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={() => setCurrentUser('me')}
+            className={`flex-1 py-3 rounded-lg font-semibold transition ${
+              currentUser === 'me'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            🌽 玉米的分數
+          </button>
+          <button
+            onClick={() => setCurrentUser('bf')}
+            className={`flex-1 py-3 rounded-lg font-semibold transition ${
+              currentUser === 'bf'
+                ? 'bg-pink-600 text-white'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            🌿 三元的分數
+          </button>
+        </div>
+
         {/* Daily Score */}
         <div className="bg-white rounded-xl p-8 mb-6 text-center shadow-sm">
-          <div className="text-gray-500 text-sm mb-2">今日點數</div>
-          <div className="text-6xl font-bold text-gray-800 mb-4">{score}</div>
-          <div className="text-gray-600 text-sm mb-6">您一天的評分</div>
+          <div className="text-gray-500 text-sm mb-2">
+            {currentUser === 'me' ? '🌽的' : '🌿 的'}今日點數
+          </div>
+          <div className="text-6xl font-bold text-gray-800 mb-4">{data[currentUser].score}</div>
+          <div className="text-gray-600 text-sm mb-6">
+            {currentUser === 'me' ? '🌽' : '🌿 友'}一天的評分
+          </div>
           <div className="flex justify-center gap-3">
             {[1, 2, 3, 4, 5].map(n => (
               <button
                 key={n}
-                onClick={() => setScore(n)}
+                onClick={() => setData(prev => ({ ...prev, [currentUser]: { ...prev[currentUser], score: n } }))}
                 className={`w-10 h-10 rounded-lg font-semibold transition ${
-                  score === n ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  data[currentUser].score === n ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {n}
@@ -157,7 +203,7 @@ export default function DailyReflection() {
                 <span className="font-semibold text-gray-800">{section.title}</span>
               </div>
               <span className="text-sm text-gray-500">
-                {data[section.category].length}/{section.items.length}
+                {data[currentUser][section.category].length}/{section.items.length}
               </span>
             </div>
             <div className="space-y-3">
@@ -165,11 +211,11 @@ export default function DailyReflection() {
                 <label key={item} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded">
                   <input
                     type="checkbox"
-                    checked={data[section.category].includes(item)}
+                    checked={data[currentUser][section.category].includes(item)}
                     onChange={() => handleCheckbox(section.category, item)}
                     className="w-5 h-5 rounded border-gray-300"
                   />
-                  <span className={data[section.category].includes(item) ? 'line-through text-gray-400' : 'text-gray-700'}>
+                  <span className={data[currentUser][section.category].includes(item) ? 'line-through text-gray-400' : 'text-gray-700'}>
                     {item}
                   </span>
                 </label>
@@ -184,7 +230,7 @@ export default function DailyReflection() {
           disabled={loading}
           className="w-full py-3 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-900 disabled:opacity-50 transition mb-4"
         >
-          {loading ? '保存中...' : saved ? '已保存！' : '保存今日日記'}
+          {loading ? '保存中...' : saved === currentUser ? '已保存！' : `保存${currentUser === 'me' ? '🌽 玉米的' : '🌿 三元的'}日記`}
         </button>
       </div>
     </div>
