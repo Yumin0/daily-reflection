@@ -8,7 +8,7 @@ import { zhCN } from 'date-fns/locale'
 type ReflectionData = {
   id?: string
   date: string
-  user: 'me' | 'bf'
+  user: 'yumin' | 'sangyuan'
   score: number
   diet: string[]
   work: string[]
@@ -18,22 +18,22 @@ type ReflectionData = {
 
 export default function DailyReflection() {
   const [date, setDate] = useState<Date>(new Date())
-  const [currentUser, setCurrentUser] = useState<'me' | 'bf'>('me')
+  const [currentUser, setCurrentUser] = useState<'yumin' | 'sangyuan'>('yumin')
   const [loading, setLoading] = useState(false)
-  const [saved, setSaved] = useState<'me' | 'bf' | null>(null)
-  const [data, setData] = useState<Record<'me' | 'bf', ReflectionData>>({
-    me: {
+  const [saved, setSaved] = useState<'yumin' | 'sangyuan' | null>(null)
+  const [data, setData] = useState<Record<'yumin' | 'sangyuan', ReflectionData>>({
+    yumin: {
       date: format(new Date(), 'yyyy-MM-dd'),
-      user: 'me',
+      user: 'yumin',
       score: 3,
       diet: [],
       work: [],
       rest: [],
       growth: [],
     },
-    bf: {
+    sangyuan: {
       date: format(new Date(), 'yyyy-MM-dd'),
-      user: 'bf',
+      user: 'sangyuan',
       score: 3,
       diet: [],
       work: [],
@@ -55,10 +55,10 @@ export default function DailyReflection() {
 
   const loadData = async () => {
     setLoading(true)
-    const users: ('me' | 'bf')[] = ['me', 'bf']
-    const newData: Record<'me' | 'bf', ReflectionData> = {
-      me: { date: dateStr, user: 'me', score: 3, diet: [], work: [], rest: [], growth: [] },
-      bf: { date: dateStr, user: 'bf', score: 3, diet: [], work: [], rest: [], growth: [] },
+    const users: ('yumin' | 'sangyuan')[] = ['yumin', 'sangyuan']
+    const newData: Record<'yumin' | 'sangyuan', ReflectionData> = {
+      yumin: { date: dateStr, user: 'yumin', score: 3, diet: [], work: [], rest: [], growth: [] },
+      sangyuan: { date: dateStr, user: 'sangyuan', score: 3, diet: [], work: [], rest: [], growth: [] },
     }
 
     for (const user of users) {
@@ -144,9 +144,9 @@ export default function DailyReflection() {
         {/* User Selection Tabs */}
         <div className="flex gap-3 mb-6">
           <button
-            onClick={() => setCurrentUser('me')}
+            onClick={() => setCurrentUser('yumin')}
             className={`flex-1 py-3 rounded-lg font-semibold transition ${
-              currentUser === 'me'
+              currentUser === 'yumin'
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
@@ -154,9 +154,9 @@ export default function DailyReflection() {
             🌽 玉米的分數
           </button>
           <button
-            onClick={() => setCurrentUser('bf')}
+            onClick={() => setCurrentUser('sangyuan')}
             className={`flex-1 py-3 rounded-lg font-semibold transition ${
-              currentUser === 'bf'
+              currentUser === 'sangyuan'
                 ? 'bg-pink-600 text-white'
                 : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
             }`}
@@ -168,11 +168,11 @@ export default function DailyReflection() {
         {/* Daily Score */}
         <div className="bg-white rounded-xl p-8 mb-6 text-center shadow-sm">
           <div className="text-gray-500 text-sm mb-2">
-            {currentUser === 'me' ? '🌽的' : '🌿 的'}今日點數
+            {currentUser === 'yumin' ? '🌽的' : '🌿的'}今日點數
           </div>
           <div className="text-6xl font-bold text-gray-800 mb-4">{data[currentUser].score}</div>
           <div className="text-gray-600 text-sm mb-6">
-            {currentUser === 'me' ? '🌽' : '🌿 友'}一天的評分
+            {currentUser === 'yumin' ? '🌽' : '🌿'}一天的評分
           </div>
           <div className="flex justify-center gap-3">
             {[1, 2, 3, 4, 5].map(n => (
@@ -230,7 +230,7 @@ export default function DailyReflection() {
           disabled={loading}
           className="w-full py-3 bg-gray-800 text-white rounded-lg font-semibold hover:bg-gray-900 disabled:opacity-50 transition mb-4"
         >
-          {loading ? '保存中...' : saved === currentUser ? '已保存！' : `保存${currentUser === 'me' ? '🌽 玉米的' : '🌿 三元的'}日記`}
+          {loading ? '保存中...' : saved === currentUser ? '已保存！' : `保存${currentUser === 'yumin' ? '🌽 玉米的' : '🌿 三元的'}日記`}
         </button>
       </div>
     </div>
