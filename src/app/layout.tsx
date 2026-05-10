@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Reflect｜心情反思日記",
   description: "每日心情反思日記",
+  openGraph: {
+    title: "Reflect｜心情反思日記",
+    description: "每日心情反思日記",
+  },
 };
 
 export default function RootLayout({
