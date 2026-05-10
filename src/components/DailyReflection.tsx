@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { format, addDays, subDays } from 'date-fns'
 
@@ -107,12 +107,24 @@ function UserCard({
   const [editConfig, setEditConfig] = useState<ChecklistConfig>(config)
   const [configSaving, setConfigSaving] = useState(false)
   const [configSaved, setConfigSaved] = useState(false)
+  const [moodError, setMoodError] = useState(false)
+  const moodRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!editMode) setEditConfig(config)
   }, [config, editMode])
 
   const totalPoints = CATEGORIES.reduce((sum, cat) => sum + data[cat].length, 0)
+
+  const handleSaveClick = () => {
+    if (data.score === 0) {
+      setMoodError(true)
+      moodRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+    setMoodError(false)
+    onSave()
+  }
 
   const handleEditToggle = () => {
     if (editMode) setEditConfig(config)
@@ -207,7 +219,7 @@ function UserCard({
 
       {/* Points + rating card */}
       {!editMode && (
-        <div style={{
+        <div ref={moodRef} style={{
           backgroundColor: '#363749', borderRadius: '18px',
           padding: '28px', marginBottom: '28px', textAlign: 'center',
           border: '1px solid #404152',
@@ -237,7 +249,7 @@ function UserCard({
               return (
                 <button
                   key={n}
-                  onClick={() => onScore(n)}
+                  onClick={() => { onScore(n); setMoodError(false) }}
                   title={label}
                   style={{
                     width: '54px', height: '54px', border: 'none',
@@ -260,6 +272,16 @@ function UserCard({
               color: cfg.primary,
             }}>
               {SCORE_EMOJIS.find(s => s.score === data.score)?.label}
+            </p>
+          )}
+          {moodError && (
+            <p style={{
+              margin: '12px 0 0 0', fontSize: '13px', fontWeight: 600,
+              color: '#F87171', backgroundColor: '#F8717122',
+              borderRadius: '10px', padding: '8px 14px',
+              border: '1px solid #F8717155',
+            }}>
+              請先選擇今天的心情，再儲存記錄
             </p>
           )}
         </div>
@@ -413,7 +435,7 @@ function UserCard({
         </div>
       ) : (
         <button
-          onClick={onSave}
+          onClick={handleSaveClick}
           disabled={loading}
           onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
           onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
