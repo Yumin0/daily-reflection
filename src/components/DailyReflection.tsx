@@ -500,17 +500,9 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
     setLoading(true)
     const { id: _, ...rest } = data[userKey]
     const payload = { ...rest, date: dateStr, user: userKey }
-
-    const { error: deleteError } = await supabase
-      .from('reflections').delete()
-      .eq('date', dateStr).eq('user', userKey)
-    if (deleteError) {
-      alert(`儲存失敗：${deleteError.message}`)
-      setLoading(false)
-      return
-    }
-
-    const { error } = await supabase.from('reflections').insert(payload)
+    const { error } = await supabase
+      .from('reflections')
+      .upsert(payload, { onConflict: 'date,user' })
     if (error) {
       alert(`儲存失敗：${error.message}`)
       setLoading(false)
