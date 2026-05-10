@@ -465,10 +465,11 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
         sangyuan: defaultRecord('sangyuan', dateStr),
       }
       for (const user of ['yumin', 'sangyuan'] as const) {
-        const { data: record } = await supabase
+        const { data: records } = await supabase
           .from('reflections').select('*')
-          .eq('date', dateStr).eq('user', user).maybeSingle()
-        if (record) newData[user] = record
+          .eq('date', dateStr).eq('user', user)
+          .order('id', { ascending: false }).limit(1)
+        if (records?.[0]) newData[user] = records[0]
       }
       setData(newData)
       setSaved(null)
@@ -497,11 +498,19 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
 
   const handleSave = async (userKey: 'yumin' | 'sangyuan') => {
     setLoading(true)
-    const ud = data[userKey]
-    const payload = { ...ud, date: dateStr, user: userKey }
-    const { error } = await supabase
-      .from('reflections')
-      .upsert(payload, { onConflict: 'date,user' })
+    const { id: _, ...rest } = data[userKey]
+    const payload = { ...rest, date: dateStr, user: userKey }
+
+    const { error: deleteError } = await supabase
+      .from('reflections').delete()
+      .eq('date', dateStr).eq('user', userKey)
+    if (deleteError) {
+      alert(`儲存失敗：${deleteError.message}`)
+      setLoading(false)
+      return
+    }
+
+    const { error } = await supabase.from('reflections').insert(payload)
     if (error) {
       alert(`儲存失敗：${error.message}`)
       setLoading(false)
