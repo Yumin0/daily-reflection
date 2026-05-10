@@ -526,7 +526,8 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
   const handleSave = async (userKey: 'yumin' | 'sangyuan') => {
     setLoading(true)
     const { id: _, ...rest } = data[userKey]
-    const payload = { ...rest, date: dateStr, user: userKey }
+    const points = CATEGORIES.reduce((sum, cat) => sum + rest[cat].length, 0)
+    const payload = { ...rest, date: dateStr, user: userKey, points }
     const { error } = await supabase
       .from('reflections')
       .upsert(payload, { onConflict: 'date,user' })
