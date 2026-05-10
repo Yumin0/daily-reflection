@@ -31,6 +31,14 @@ type ChecklistConfig = {
 const CATEGORIES = ['diet', 'work', 'rest', 'growth'] as const
 type CategoryKey = typeof CATEGORIES[number]
 
+const SCORE_EMOJIS = [
+  { score: 1, emoji: '😵', label: '今天有點撐不住' },
+  { score: 2, emoji: '😕', label: '今天不太順' },
+  { score: 3, emoji: '😐', label: '普普通通的一天' },
+  { score: 4, emoji: '🙂', label: '今天還不錯' },
+  { score: 5, emoji: '😁', label: '今天很滿足' },
+]
+
 const DEFAULT_CONFIG: ChecklistConfig = {
   diet:   { title: '飲食',   icon: '🍽️', items: ['高蛋白質早餐', '喝夠4000cc的水', '有吃到蔬菜', '額外進食加工食品', '完全無飲食習慣'] },
   work:   { title: '工作',   icon: '💼', items: ['完成今日課表重點工作', '有至少2小時深度工作', '完成公開演講', '推進了長期目標'] },
@@ -58,7 +66,7 @@ const USER_CONFIG = {
 }
 
 const defaultRecord = (user: 'yumin' | 'sangyuan', date: string): ReflectionData => ({
-  date, user, score: 3, diet: [], work: [], rest: [], growth: [],
+  date, user, score: 0, diet: [], work: [], rest: [], growth: [],
 })
 
 function CheckSVG() {
@@ -222,25 +230,38 @@ function UserCard({
           <p style={{
             margin: '0 0 16px 0', fontSize: '13px', color: '#6B7280',
             fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px',
-          }}>您一天的評分</p>
+          }}>今天的心情如何？</p>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            {[1, 2, 3, 4, 5].map(n => (
-              <button
-                key={n}
-                onClick={() => onScore(n)}
-                style={{
-                  width: '54px', height: '54px', border: 'none',
-                  borderRadius: '14px', fontSize: '20px', fontWeight: 700,
-                  cursor: 'pointer', transition: 'all 0.2s ease',
-                  fontFamily: 'inherit', color: '#FFF',
-                  background: data.score === n ? cfg.gradient : '#2A2B3D',
-                  boxShadow: data.score === n ? `0 4px 12px ${cfg.shadow}` : '0 2px 4px rgba(0,0,0,0.2)',
-                  transform: data.score === n ? 'scale(1.05)' : 'scale(1)',
-                  opacity: data.score === n ? 1 : 0.6,
-                }}
-              >{n}</button>
-            ))}
+            {SCORE_EMOJIS.map(({ score: n, emoji, label }) => {
+              const isSelected = data.score === n
+              return (
+                <button
+                  key={n}
+                  onClick={() => onScore(n)}
+                  title={label}
+                  style={{
+                    width: '54px', height: '54px', border: 'none',
+                    borderRadius: '14px', fontSize: '26px',
+                    cursor: 'pointer', transition: 'all 0.2s ease',
+                    fontFamily: 'inherit',
+                    background: isSelected ? cfg.gradient : '#2A2B3D',
+                    boxShadow: isSelected ? `0 4px 12px ${cfg.shadow}` : '0 2px 4px rgba(0,0,0,0.2)',
+                    transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                    opacity: isSelected ? 1 : 0.5,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >{emoji}</button>
+              )
+            })}
           </div>
+          {data.score > 0 && (
+            <p style={{
+              margin: '16px 0 0 0', fontSize: '15px', fontWeight: 600,
+              color: cfg.primary,
+            }}>
+              {SCORE_EMOJIS.find(s => s.score === data.score)?.label}
+            </p>
+          )}
         </div>
       )}
 
@@ -493,7 +514,13 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
   }
 
   const handleScore = (userKey: 'yumin' | 'sangyuan', score: number) => {
-    setData(prev => ({ ...prev, [userKey]: { ...prev[userKey], score } }))
+    setData(prev => ({
+      ...prev,
+      [userKey]: {
+        ...prev[userKey],
+        score: prev[userKey].score === score ? 0 : score,
+      },
+    }))
   }
 
   const handleSave = async (userKey: 'yumin' | 'sangyuan') => {
