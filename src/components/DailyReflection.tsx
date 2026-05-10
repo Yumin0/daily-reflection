@@ -16,16 +16,14 @@ type ReflectionData = {
 }
 
 type CategoryConfig = {
+  id: CategoryKey
   title: string
   icon: string
   items: string[]
 }
 
 type ChecklistConfig = {
-  diet: CategoryConfig
-  work: CategoryConfig
-  rest: CategoryConfig
-  growth: CategoryConfig
+  categories: CategoryConfig[]
 }
 
 const CATEGORIES = ['diet', 'work', 'rest', 'growth'] as const
@@ -40,10 +38,26 @@ const SCORE_EMOJIS = [
 ]
 
 const DEFAULT_CONFIG: ChecklistConfig = {
-  diet:   { title: '飲食',   icon: '🍽️', items: ['高蛋白質早餐', '喝夠4000cc的水', '有吃到蔬菜', '額外進食加工食品', '完全無飲食習慣'] },
-  work:   { title: '工作',   icon: '💼', items: ['完成今日課表重點工作', '有至少2小時深度工作', '完成公開演講', '推進了長期目標'] },
-  rest:   { title: '休閒',   icon: '🛋️', items: ['真正放鬆(非滑手機)', '有充分休息', '陪伴彼此', '與朋友聚會'] },
-  growth: { title: '自我成長', icon: '✨', items: ['反思了自己', '學習了新技能', '獲得了新想法', '突破了一點', '記下一個好方法改進'] },
+  categories: [
+    { id: 'diet',   title: '飲食',     icon: '🍽️', items: ['高蛋白質早餐', '喝夠4000cc的水', '有吃到蔬菜', '額外進食加工食品', '完全無飲食習慣'] },
+    { id: 'work',   title: '工作',     icon: '💼', items: ['完成今日課表重點工作', '有至少2小時深度工作', '完成公開演講', '推進了長期目標'] },
+    { id: 'rest',   title: '休閒',     icon: '🛋️', items: ['真正放鬆(非滑手機)', '有充分休息', '陪伴彼此', '與朋友聚會'] },
+    { id: 'growth', title: '自我成長', icon: '✨', items: ['反思了自己', '學習了新技能', '獲得了新想法', '突破了一點', '記下一個好方法改進'] },
+  ],
+}
+
+function migrateConfig(raw: unknown): ChecklistConfig {
+  if (!raw || typeof raw !== 'object') return DEFAULT_CONFIG
+  const r = raw as Record<string, unknown>
+  if (Array.isArray(r.categories)) return raw as ChecklistConfig
+  // Old format: { diet: {...}, work: {...}, rest: {...}, growth: {...} }
+  const categories: CategoryConfig[] = CATEGORIES
+    .filter(k => k in r && r[k] && typeof r[k] === 'object')
+    .map(k => {
+      const cat = r[k] as { title?: string; icon?: string; items?: string[] }
+      return { id: k, title: cat.title ?? k, icon: cat.icon ?? '⭐', items: cat.items ?? [] }
+    })
+  return { categories: categories.length ? categories : DEFAULT_CONFIG.categories }
 }
 
 const USER_CONFIG = {
@@ -114,7 +128,7 @@ function UserCard({
     if (!editMode) setEditConfig(config)
   }, [config, editMode])
 
-  const totalPoints = CATEGORIES.reduce((sum, cat) => sum + data[cat].length, 0)
+  const totalPoints = config.categories.reduce((sum, cat) => sum + data[cat.id].length, 0)
 
   const handleSaveClick = () => {
     if (data.score === 0) {
@@ -140,21 +154,68 @@ function UserCard({
     setTimeout(() => setConfigSaved(false), 2000)
   }
 
-  const updateCategoryTitle = (cat: CategoryKey, title: string) => {
-    setEditConfig(prev => ({ ...prev, [cat]: { ...prev[cat], title } }))
+  const updateCategoryTitle = (catId: CategoryKey, title: string) => {
+    setEditConfig(prev => ({
+      ...prev,
+      categories: prev.categories.map(c => c.id === catId ? { ...c, title } : c),
+    }))
   }
 
-  const updateCategoryIcon = (cat: CategoryKey, icon: string) => {
-    setEditConfig(prev => ({ ...prev, [cat]: { ...prev[cat], icon } }))
+  const updateCategoryIcon = (catId: CategoryKey, icon: string) => {
+    setEditConfig(prev => ({
+      ...prev,
+      categories: prev.categories.map(c => c.id === catId ? { ...c, icon } : c),
+    }))
   }
 
-  const updateItem = (cat: CategoryKey, index: number, value: string) => {
-    setEditConfig(prev => {
-      const items = [...prev[cat].items]
-      items[index] = value
-      return { ...prev, [cat]: { ...prev[cat], items } }
-    })
+  const updateItem = (catId: CategoryKey, index: number, value: string) => {
+    setEditConfig(prev => ({
+      ...prev,
+      categories: prev.categories.map(c => {
+        if (c.id !== catId) return c
+        const items = [...c.items]
+        items[index] = value
+        return { ...c, items }
+      }),
+    }))
   }
+
+  const addItem = (catId: CategoryKey) => {
+    setEditConfig(prev => ({
+      ...prev,
+      categories: prev.categories.map(c =>
+        c.id === catId ? { ...c, items: [...c.items, ''] } : c
+      ),
+    }))
+  }
+
+  const deleteItem = (catId: CategoryKey, index: number) => {
+    setEditConfig(prev => ({
+      ...prev,
+      categories: prev.categories.map(c =>
+        c.id === catId ? { ...c, items: c.items.filter((_, i) => i !== index) } : c
+      ),
+    }))
+  }
+
+  const addCategory = () => {
+    const usedIds = editConfig.categories.map(c => c.id)
+    const nextId = CATEGORIES.find(k => !usedIds.includes(k))
+    if (!nextId) return
+    setEditConfig(prev => ({
+      ...prev,
+      categories: [...prev.categories, { id: nextId, title: '新類別', icon: '⭐', items: ['新選項'] }],
+    }))
+  }
+
+  const deleteCategory = (catId: CategoryKey) => {
+    setEditConfig(prev => ({
+      ...prev,
+      categories: prev.categories.filter(c => c.id !== catId),
+    }))
+  }
+
+  const canAddCategory = editConfig.categories.length < CATEGORIES.length
 
   return (
     <div style={{
@@ -213,7 +274,7 @@ function UserCard({
           marginBottom: '20px', fontSize: '13px',
           color: cfg.primary, fontWeight: 600,
         }}>
-          編輯模式：修改類別名稱與選項文字，完成後點「儲存設定」
+          編輯模式：可修改名稱、新增或刪除類別與選項，完成後點「儲存設定」
         </div>
       )}
 
@@ -288,82 +349,112 @@ function UserCard({
       )}
 
       {/* Category sections */}
-      {CATEGORIES.map(cat => {
-        const display = editMode ? editConfig[cat] : config[cat]
-        const checked = data[cat]
+      {(editMode ? editConfig : config).categories.map(cat => {
+        const checked = data[cat.id]
         return (
-          <div key={cat} style={{ marginBottom: '24px' }}>
+          <div key={cat.id} style={{ marginBottom: '24px' }}>
             <h3 style={{
               fontSize: '17px', fontWeight: 700, margin: '0 0 14px 0',
               display: 'flex', alignItems: 'center', gap: '10px', color: '#FFFFFF',
             }}>
               {editMode ? (
-                <input
-                  value={editConfig[cat].icon}
-                  onChange={e => updateCategoryIcon(cat, e.target.value)}
-                  style={{
-                    width: '44px', background: '#1E1F2E',
-                    border: `1px solid ${cfg.primary}88`,
-                    borderRadius: '8px', color: '#FFF',
-                    fontSize: '18px', textAlign: 'center',
-                    padding: '4px 4px', fontFamily: 'inherit',
-                    outline: 'none', flexShrink: 0,
-                  }}
-                />
-              ) : (
-                <span style={{ fontSize: '20px' }}>{display.icon}</span>
-              )}
-              {editMode ? (
-                <input
-                  value={editConfig[cat].title}
-                  onChange={e => updateCategoryTitle(cat, e.target.value)}
-                  style={{
-                    flex: 1, background: '#1E1F2E',
-                    border: `1px solid ${cfg.primary}88`,
-                    borderRadius: '8px', color: '#FFF',
-                    fontSize: '15px', fontWeight: 700,
-                    padding: '5px 10px', fontFamily: 'inherit',
-                    outline: 'none',
-                  }}
-                />
+                <>
+                  <input
+                    value={cat.icon}
+                    onChange={e => updateCategoryIcon(cat.id, e.target.value)}
+                    style={{
+                      width: '44px', background: '#1E1F2E',
+                      border: `1px solid ${cfg.primary}88`,
+                      borderRadius: '8px', color: '#FFF',
+                      fontSize: '18px', textAlign: 'center',
+                      padding: '4px 4px', fontFamily: 'inherit',
+                      outline: 'none', flexShrink: 0,
+                    }}
+                  />
+                  <input
+                    value={cat.title}
+                    onChange={e => updateCategoryTitle(cat.id, e.target.value)}
+                    style={{
+                      flex: 1, background: '#1E1F2E',
+                      border: `1px solid ${cfg.primary}88`,
+                      borderRadius: '8px', color: '#FFF',
+                      fontSize: '15px', fontWeight: 700,
+                      padding: '5px 10px', fontFamily: 'inherit',
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={() => deleteCategory(cat.id)}
+                    title="刪除此類別"
+                    style={{
+                      background: 'none', border: '1px solid #F8717155',
+                      borderRadius: '8px', cursor: 'pointer',
+                      color: '#F87171', fontSize: '16px',
+                      width: '30px', height: '30px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#F8717122'
+                      e.currentTarget.style.borderColor = '#F87171'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'none'
+                      e.currentTarget.style.borderColor = '#F8717155'
+                    }}
+                  >×</button>
+                </>
               ) : (
                 <>
-                  <span style={{ flex: 1 }}>{display.title}</span>
+                  <span style={{ fontSize: '20px' }}>{cat.icon}</span>
+                  <span style={{ flex: 1 }}>{cat.title}</span>
                   <span style={{
                     fontSize: '13px', color: '#6B7280', fontWeight: 600,
                     padding: '4px 10px', backgroundColor: '#363749', borderRadius: '8px',
                   }}>
-                    {checked.length}/{display.items.length}
+                    {checked.length}/{cat.items.length}
                   </span>
                 </>
               )}
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {display.items.map((item, idx) => {
+              {cat.items.map((item, idx) => {
                 if (editMode) {
                   return (
-                    <div key={idx} style={{ position: 'relative' }}>
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span style={{
-                        position: 'absolute', left: '14px', top: '50%',
-                        transform: 'translateY(-50%)', color: '#6B7280',
-                        fontSize: '13px', fontWeight: 600, userSelect: 'none',
+                        color: '#6B7280', fontSize: '13px', fontWeight: 600,
+                        width: '20px', textAlign: 'right', flexShrink: 0,
                       }}>{idx + 1}</span>
                       <input
-                        value={editConfig[cat].items[idx]}
-                        onChange={e => updateItem(cat, idx, e.target.value)}
+                        value={item}
+                        onChange={e => updateItem(cat.id, idx, e.target.value)}
                         style={{
-                          width: '100%', boxSizing: 'border-box',
+                          flex: 1, boxSizing: 'border-box',
                           background: '#363749', border: '1px solid #404152',
                           borderRadius: '14px', color: '#FFF',
                           fontSize: '15px', fontWeight: 500,
-                          padding: '13px 16px 13px 36px',
+                          padding: '13px 16px',
                           fontFamily: 'inherit', outline: 'none',
                           transition: 'border-color 0.15s ease',
                         }}
                         onFocus={e => { e.currentTarget.style.borderColor = cfg.primary }}
                         onBlur={e => { e.currentTarget.style.borderColor = '#404152' }}
                       />
+                      <button
+                        onClick={() => deleteItem(cat.id, idx)}
+                        title="刪除此選項"
+                        style={{
+                          background: 'none', border: 'none',
+                          cursor: 'pointer', color: '#6B7280',
+                          fontSize: '20px', padding: '4px 6px',
+                          borderRadius: '8px', flexShrink: 0,
+                          lineHeight: 1, transition: 'color 0.15s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.color = '#F87171' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = '#6B7280' }}
+                      >×</button>
                     </div>
                   )
                 }
@@ -391,7 +482,7 @@ function UserCard({
                     <input
                       type="checkbox"
                       checked={isChecked}
-                      onChange={() => onCheckbox(cat, item)}
+                      onChange={() => onCheckbox(cat.id, item)}
                       style={{ display: 'none' }}
                     />
                     <span style={{
@@ -402,10 +493,65 @@ function UserCard({
                   </label>
                 )
               })}
+
+              {editMode && (
+                <button
+                  onClick={() => addItem(cat.id)}
+                  style={{
+                    background: 'none',
+                    border: `1.5px dashed ${cfg.primary}66`,
+                    borderRadius: '14px', color: cfg.primary,
+                    fontSize: '14px', fontWeight: 600,
+                    padding: '11px 16px', cursor: 'pointer',
+                    fontFamily: 'inherit', transition: 'all 0.15s ease',
+                    textAlign: 'left',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = cfg.primary + '11'
+                    e.currentTarget.style.borderColor = cfg.primary
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'none'
+                    e.currentTarget.style.borderColor = cfg.primary + '66'
+                  }}
+                >+ 新增選項</button>
+              )}
             </div>
           </div>
         )
       })}
+
+      {/* Add category button */}
+      {editMode && (
+        <div style={{ marginBottom: '16px' }}>
+          {canAddCategory ? (
+            <button
+              onClick={addCategory}
+              style={{
+                width: '100%', background: 'none',
+                border: `1.5px dashed ${cfg.primary}55`,
+                borderRadius: '16px', color: cfg.primary,
+                fontSize: '15px', fontWeight: 600,
+                padding: '14px 16px', cursor: 'pointer',
+                fontFamily: 'inherit', transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = cfg.primary + '11'
+                e.currentTarget.style.borderColor = cfg.primary
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'none'
+                e.currentTarget.style.borderColor = cfg.primary + '55'
+              }}
+            >+ 新增類別</button>
+          ) : (
+            <p style={{
+              textAlign: 'center', fontSize: '13px', color: '#6B7280',
+              margin: 0, padding: '8px 0',
+            }}>已達最多 4 個類別</p>
+          )}
+        </div>
+      )}
 
       {/* Edit mode actions */}
       {editMode ? (
@@ -493,7 +639,7 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
           .from('checklist_config').select('config')
           .eq('user', user).maybeSingle()
         if (row?.config) {
-          setConfigs(prev => ({ ...prev, [user]: row.config as ChecklistConfig }))
+          setConfigs(prev => ({ ...prev, [user]: migrateConfig(row.config) }))
         }
       }
     }
