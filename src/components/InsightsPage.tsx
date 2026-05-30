@@ -85,6 +85,20 @@ type ChallengeStats = {
 
 type ChallengeView = 'both' | 'yumin' | 'sangyuan'
 
+type RankingView = 'both' | 'yumin' | 'sangyuan'
+type RankingItem = { label: string; count: number; users: ('yumin' | 'sangyuan')[] }
+type RankingData = { done: RankingItem[]; forgotten: RankingItem[] }
+
+function parseUserItems(raw: unknown): string[] {
+  if (!raw || typeof raw !== 'object') return []
+  const r = raw as Record<string, unknown>
+  if (Array.isArray(r.categories)) {
+    return (r.categories as Array<{ items?: string[] }>).flatMap(c => c.items ?? [])
+  }
+  return ['diet', 'work', 'rest', 'growth']
+    .filter(k => k in r && r[k] && typeof r[k] === 'object')
+    .flatMap(k => ((r[k] as { items?: string[] }).items ?? []))
+}
 
 function ChevronDownSVG() {
   return (
@@ -111,6 +125,12 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
   })
   const [challengeStats, setChallengeStats] = useState<Record<ChallengeView, ChallengeStats[]>>({ both: [], yumin: [], sangyuan: [] })
   const [challengeView, setChallengeView] = useState<ChallengeView>('both')
+  const [rankingView, setRankingView] = useState<RankingView>('both')
+  const [rankingData, setRankingData] = useState<Record<RankingView, RankingData>>({
+    both: { done: [], forgotten: [] },
+    yumin: { done: [], forgotten: [] },
+    sangyuan: { done: [], forgotten: [] },
+  })
   const [loading, setLoading] = useState(true)
 
   const periodInfo = getPeriodRange(period)
@@ -188,6 +208,66 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
           both: computeView((day, yl, sl) => day.yumin.includes(yl) && day.sangyuan.includes(sl)),
           yumin: computeView((day, yl) => day.yumin.includes(yl)),
           sangyuan: computeView((day, _yl, sl) => day.sangyuan.includes(sl)),
+        })
+
+        // Fetch checklist configs for ranking
+        const userItems: Record<'yumin' | 'sangyuan', string[]> = { yumin: [], sangyuan: [] }
+        await Promise.all((['yumin', 'sangyuan'] as const).map(async (u) => {
+          const { data: cfg } = await supabase.from('checklist_config').select('config').eq('user', u).maybeSingle()
+          userItems[u] = parseUserItems(cfg?.config)
+        }))
+
+        // Compute done counts per user
+        const doneCounts: Record<'yumin' | 'sangyuan', Record<string, number>> = { yumin: {}, sangyuan: {} }
+
+        for (const row of challengeData) {
+          const u = row.user as 'yumin' | 'sangyuan'
+          const checked = new Set<string>([
+            ...(row.diet ?? []),
+            ...(row.work ?? []),
+            ...(row.rest ?? []),
+            ...(row.growth ?? []),
+          ])
+          for (const item of checked) {
+            doneCounts[u][item] = (doneCounts[u][item] ?? 0) + 1
+          }
+        }
+
+        // Top 5 most done (descending)
+        const top5 = (counts: Record<string, number>, user: 'yumin' | 'sangyuan'): RankingItem[] =>
+          Object.entries(counts)
+            .map(([label, count]) => ({ label, count, users: [user] as ('yumin' | 'sangyuan')[] }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5)
+
+        const bothTop5 = (a: Record<string, number>, b: Record<string, number>): RankingItem[] => [
+          ...Object.entries(a).map(([label, count]) => ({ label, count, users: ['yumin' as const] })),
+          ...Object.entries(b).map(([label, count]) => ({ label, count, users: ['sangyuan' as const] })),
+        ].sort((x, y) => y.count - x.count).slice(0, 5)
+
+        // Bottom 5 least done from config items (ascending), only items done at least once
+        const bottom5 = (counts: Record<string, number>, configItems: string[], user: 'yumin' | 'sangyuan'): RankingItem[] =>
+          configItems
+            .filter(item => (counts[item] ?? 0) > 0)
+            .map(item => ({ label: item, count: counts[item] ?? 0, users: [user] as ('yumin' | 'sangyuan')[] }))
+            .sort((a, b) => a.count - b.count)
+            .slice(0, 5)
+
+        const bothBottom5 = (
+          yCounts: Record<string, number>, yItems: string[],
+          sCounts: Record<string, number>, sItems: string[]
+        ): RankingItem[] => [
+          ...yItems.filter(item => (yCounts[item] ?? 0) > 0).map(item => ({ label: item, count: yCounts[item] ?? 0, users: ['yumin' as const] })),
+          ...sItems.filter(item => (sCounts[item] ?? 0) > 0).map(item => ({ label: item, count: sCounts[item] ?? 0, users: ['sangyuan' as const] })),
+        ].sort((a, b) => a.count - b.count).slice(0, 5)
+
+        setRankingData({
+          yumin: { done: top5(doneCounts.yumin, 'yumin'), forgotten: bottom5(doneCounts.yumin, userItems.yumin, 'yumin') },
+          sangyuan: { done: top5(doneCounts.sangyuan, 'sangyuan'), forgotten: bottom5(doneCounts.sangyuan, userItems.sangyuan, 'sangyuan') },
+          both: {
+            done: bothTop5(doneCounts.yumin, doneCounts.sangyuan),
+            forgotten: bothBottom5(doneCounts.yumin, userItems.yumin, doneCounts.sangyuan, userItems.sangyuan),
+          },
         })
       }
 
@@ -404,6 +484,123 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
           )
         })}
       </div>
+
+      {/* Top 5 排名 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '32px 0 16px 0' }}>
+        <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>Top 5 排名</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {([
+            { key: 'both', label: '全部' },
+            { key: 'yumin', label: '玉米', color: '#FF8B4D' },
+            { key: 'sangyuan', label: '三元', color: '#45D4C4' },
+          ] as { key: RankingView; label: string; color?: string }[]).map(btn => {
+            const isActive = rankingView === btn.key
+            const activeColor = btn.color ?? '#FFFFFF'
+            return (
+              <button
+                key={btn.key}
+                onClick={() => setRankingView(btn.key)}
+                style={{
+                  border: `1.5px solid ${isActive ? activeColor : '#404152'}`,
+                  borderRadius: '20px',
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  background: isActive ? `${activeColor}22` : 'transparent',
+                  color: isActive ? activeColor : '#6B7280',
+                  transition: 'all 0.15s ease',
+                }}
+              >{btn.label}</button>
+            )
+          })}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '16px 0' }}>載入中...</div>
+      ) : (
+        <>
+          {/* 最常做到 */}
+          <div style={{
+            backgroundColor: '#2A2B3D', borderRadius: '20px',
+            padding: '20px', border: '1px solid #404152', marginBottom: '16px',
+          }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#FF8B4D', marginBottom: '20px' }}>
+              ✅ 最常做到
+            </div>
+            {rankingData[rankingView].done.length === 0 ? (
+              <div style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '8px 0' }}>暫無資料</div>
+            ) : rankingData[rankingView].done.map((item, i) => {
+              const maxCount = rankingData[rankingView].done[0].count
+              const soleUser = rankingView === 'both' ? item.users[0] : null
+              return (
+                <div key={`${item.label}-${item.users[0]}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  marginBottom: i < rankingData[rankingView].done.length - 1 ? '16px' : 0,
+                }}>
+                  <span style={{ width: '16px', color: '#6B7280', fontWeight: 700, fontSize: '15px', textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    {soleUser && (
+                      <span style={{
+                        fontSize: '11px', fontWeight: 600, flexShrink: 0,
+                        color: soleUser === 'yumin' ? '#FF8B4D' : '#45D4C4',
+                        border: `1px solid ${soleUser === 'yumin' ? '#FF8B4D' : '#45D4C4'}`,
+                        borderRadius: '8px', padding: '1px 6px',
+                      }}>{soleUser === 'yumin' ? '玉米' : '三元'}</span>
+                    )}
+                  </span>
+                  <div style={{ width: '90px', height: '8px', backgroundColor: '#404152', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                    <div style={{ height: '100%', width: `${Math.round(item.count / maxCount * 100)}%`, background: '#FF8B4D', borderRadius: '4px', transition: 'width 0.6s ease' }} />
+                  </div>
+                  <span style={{ color: '#FF8B4D', fontWeight: 700, fontSize: '15px', minWidth: '46px', textAlign: 'right', flexShrink: 0 }}>{item.count}次</span>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 最常忘記 */}
+          <div style={{
+            backgroundColor: '#2A2B3D', borderRadius: '20px',
+            padding: '20px', border: '1px solid #404152',
+          }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: '#45D4C4', marginBottom: '20px' }}>
+              💤 最常忘記
+            </div>
+            {rankingData[rankingView].forgotten.length === 0 ? (
+              <div style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '8px 0' }}>暫無資料</div>
+            ) : rankingData[rankingView].forgotten.map((item, i) => {
+              const maxCount = rankingData[rankingView].forgotten[0].count
+              const soleUser = rankingView === 'both' ? item.users[0] : null
+              return (
+                <div key={`${item.label}-${item.users[0]}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  marginBottom: i < rankingData[rankingView].forgotten.length - 1 ? '16px' : 0,
+                }}>
+                  <span style={{ width: '16px', color: '#6B7280', fontWeight: 700, fontSize: '15px', textAlign: 'right', flexShrink: 0 }}>{i + 1}</span>
+                  <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    {soleUser && (
+                      <span style={{
+                        fontSize: '11px', fontWeight: 600, flexShrink: 0,
+                        color: soleUser === 'yumin' ? '#FF8B4D' : '#45D4C4',
+                        border: `1px solid ${soleUser === 'yumin' ? '#FF8B4D' : '#45D4C4'}`,
+                        borderRadius: '8px', padding: '1px 6px',
+                      }}>{soleUser === 'yumin' ? '玉米' : '三元'}</span>
+                    )}
+                  </span>
+                  <div style={{ width: '90px', height: '8px', backgroundColor: '#404152', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                    <div style={{ height: '100%', width: `${Math.round(item.count / maxCount * 100)}%`, background: '#45D4C4', borderRadius: '4px', transition: 'width 0.6s ease' }} />
+                  </div>
+                  <span style={{ color: '#45D4C4', fontWeight: 700, fontSize: '15px', minWidth: '46px', textAlign: 'right', flexShrink: 0 }}>{item.count}次</span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
