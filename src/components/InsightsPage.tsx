@@ -77,6 +77,7 @@ type UserStats = {
   mostFrequentScore: number
   avgScore: number
   count: number
+  scoreFreq: Record<number, number>
 }
 
 type ChallengeStats = {
@@ -121,7 +122,7 @@ const PERIODS: { key: PeriodKey }[] = [
 ]
 
 export default function InsightsPage({ onBack }: { onBack: () => void }) {
-  const [period, setPeriod] = useState<PeriodKey>('this_month')
+  const [period, setPeriod] = useState<PeriodKey>('last_7_days')
   const [showDropdown, setShowDropdown] = useState(false)
   const [stats, setStats] = useState<Record<'yumin' | 'sangyuan', UserStats | null>>({
     yumin: null,
@@ -136,6 +137,7 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
     sangyuan: { done: [], forgotten: [] },
   })
   const [loading, setLoading] = useState(true)
+  const [showScoreDetail, setShowScoreDetail] = useState(false)
 
   const periodInfo = getPeriodRange(period)
 
@@ -171,7 +173,7 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
             Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0]
           )
 
-          newStats[user] = { mostFrequentScore, avgScore, count: scores.length }
+          newStats[user] = { mostFrequentScore, avgScore, count: scores.length, scoreFreq: freq }
         }
       }
 
@@ -356,7 +358,24 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* Mood overview */}
-      <h2 style={{ fontSize: '22px', fontWeight: 700, margin: '0 0 16px 0' }}>心情總覽</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '0 0 16px 0' }}>
+        <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>心情總覽</h2>
+        <button
+          onClick={() => setShowScoreDetail(d => !d)}
+          style={{
+            background: showScoreDetail ? '#363749' : 'transparent',
+            border: '1.5px solid #404152',
+            borderRadius: '20px',
+            padding: '4px 12px',
+            fontSize: '13px',
+            fontWeight: 600,
+            color: showScoreDetail ? '#FFF' : '#6B7280',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            transition: 'all 0.15s ease',
+          }}
+        >更多</button>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         {(['yumin', 'sangyuan'] as const).map(user => {
@@ -401,6 +420,31 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
                   <p style={{ margin: 0, fontSize: '12px', color: '#6B7280', fontWeight: 500 }}>
                     平均分數 / 5
                   </p>
+                  {showScoreDetail && (
+                    <div style={{
+                      marginTop: '16px',
+                      borderTop: '1px solid #404152',
+                      paddingTop: '14px',
+                      display: 'flex',
+                      justifyContent: 'space-around',
+                    }}>
+                      {SCORE_EMOJIS.map(({ score, emoji: e }) => (
+                        <div key={score} style={{ textAlign: 'center' }}>
+                          <div style={{
+                            fontSize: '22px',
+                            lineHeight: 1,
+                            marginBottom: '4px',
+                            opacity: userStats.mostFrequentScore === score ? 1 : 0.45,
+                          }}>{e}</div>
+                          <div style={{
+                            fontSize: '13px',
+                            fontWeight: 700,
+                            color: userStats.mostFrequentScore === score ? cfg.primary : '#6B7280',
+                          }}>{userStats.scoreFreq[score] ?? 0}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div style={{ color: '#6B7280', fontSize: '14px', padding: '24px 0' }}>
