@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { format, addDays, subDays } from 'date-fns'
+import InsightsPage from './InsightsPage'
 
 type ReflectionData = {
   id?: string
@@ -611,6 +612,7 @@ function formatDateHeader(d: Date) {
 export default function DailyReflection({ initialUser = 'yumin' }: { initialUser?: 'yumin' | 'sangyuan' }) {
   const [date, setDate] = useState<Date>(new Date())
   const [activeUser, setActiveUser] = useState<'yumin' | 'sangyuan'>(initialUser)
+  const [showInsights, setShowInsights] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState<'yumin' | 'sangyuan' | null>(null)
   const [isMobile, setIsMobile] = useState(false)
@@ -728,8 +730,43 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
       fontFamily: "'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       color: '#FFFFFF',
       padding: isMobile ? '16px' : '24px',
+      position: 'relative',
     }}>
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+      {/* Insights slide-in overlay */}
+      <div style={{
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        transform: showInsights ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        zIndex: 100,
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
+      }}>
+        <InsightsPage onBack={() => setShowInsights(false)} />
+      </div>
+
+      <div style={{ textAlign: 'center', marginBottom: '24px', position: 'relative' }}>
+        {/* Insights button */}
+        <button
+          onClick={() => setShowInsights(true)}
+          style={{
+            position: 'absolute', top: 0, right: 0,
+            background: '#2A2B3D', border: '1px solid #404152',
+            borderRadius: '20px', padding: '8px 14px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            color: '#D1D5DB', fontSize: '14px', fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
+          洞察
+        </button>
+
         <h1 style={{
           fontSize: isMobile ? '24px' : '32px', fontWeight: 700,
           margin: '0 0 8px 0',
