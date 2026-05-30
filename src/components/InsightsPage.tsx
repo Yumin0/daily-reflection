@@ -121,7 +121,7 @@ const PERIODS: { key: PeriodKey }[] = [
   { key: 'all_time' },
 ]
 
-export default function InsightsPage({ onBack }: { onBack: () => void }) {
+export default function InsightsPage({ onBack, visible }: { onBack: () => void; visible?: boolean }) {
   const [period, setPeriod] = useState<PeriodKey>('last_7_days')
   const [showDropdown, setShowDropdown] = useState(false)
   const [stats, setStats] = useState<Record<'yumin' | 'sangyuan', UserStats | null>>({
@@ -281,7 +281,7 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
     }
 
     fetchStats()
-  }, [period])
+  }, [period, visible])
 
   return (
     <div style={{

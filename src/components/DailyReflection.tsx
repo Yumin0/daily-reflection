@@ -742,7 +742,7 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'],
       }}>
-        <InsightsPage onBack={() => setShowInsights(false)} />
+        <InsightsPage visible={showInsights} onBack={() => setShowInsights(false)} />
       </div>
 
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
