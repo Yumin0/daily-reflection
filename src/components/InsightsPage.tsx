@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear } from 'date-fns'
+import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, differenceInCalendarDays, parseISO } from 'date-fns'
 
 const SCORE_EMOJIS = [
   { score: 1, emoji: '😵' },
@@ -65,11 +65,26 @@ function getPeriodRange(period: PeriodKey): { start: string; end: string; label:
   }
 }
 
+const SHARED_CHALLENGES = [
+  { label: '12點前睡覺', yumin: '12點前睡覺', sangyuan: '12點前睡覺' },
+  { label: '有吃蔬菜或水果', yumin: '有吃到蔬菜或水果', sangyuan: '有吃蔬菜或水果' },
+]
+
 type UserStats = {
   mostFrequentScore: number
   avgScore: number
   count: number
 }
+
+type ChallengeStats = {
+  label: string
+  count: number
+  total: number
+  pct: number
+}
+
+type ChallengeView = 'both' | 'yumin' | 'sangyuan'
+
 
 function ChevronDownSVG() {
   return (
@@ -94,6 +109,8 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
     yumin: null,
     sangyuan: null,
   })
+  const [challengeStats, setChallengeStats] = useState<Record<ChallengeView, ChallengeStats[]>>({ both: [], yumin: [], sangyuan: [] })
+  const [challengeView, setChallengeView] = useState<ChallengeView>('both')
   const [loading, setLoading] = useState(true)
 
   const periodInfo = getPeriodRange(period)
@@ -135,6 +152,45 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
       }
 
       setStats(newStats)
+
+      // Shared challenges
+      const { data: challengeData } = await supabase
+        .from('reflections')
+        .select('date, user, diet, work, rest, growth')
+        .in('user', ['yumin', 'sangyuan'])
+        .gte('date', start)
+        .lte('date', end)
+
+      if (challengeData) {
+        const byDate: Record<string, Record<'yumin' | 'sangyuan', string[]>> = {}
+        for (const row of challengeData) {
+          const allItems = [
+            ...(row.diet || []),
+            ...(row.work || []),
+            ...(row.rest || []),
+            ...(row.growth || []),
+          ]
+          if (!byDate[row.date]) byDate[row.date] = { yumin: [], sangyuan: [] }
+          byDate[row.date][row.user as 'yumin' | 'sangyuan'] = allItems
+        }
+
+        const today = format(new Date(), 'yyyy-MM-dd')
+        const effectiveEnd = end < today ? end : today
+        const totalDays = differenceInCalendarDays(parseISO(effectiveEnd), parseISO(start)) + 1
+
+        const computeView = (check: (day: Record<'yumin' | 'sangyuan', string[]>, yl: string, sl: string) => boolean) =>
+          SHARED_CHALLENGES.map(({ label, yumin: yl, sangyuan: sl }) => {
+            const count = Object.values(byDate).filter(day => check(day, yl, sl)).length
+            return { label, count, total: totalDays, pct: Math.round(count / totalDays * 100) }
+          })
+
+        setChallengeStats({
+          both: computeView((day, yl, sl) => day.yumin.includes(yl) && day.sangyuan.includes(sl)),
+          yumin: computeView((day, yl) => day.yumin.includes(yl)),
+          sangyuan: computeView((day, _yl, sl) => day.sangyuan.includes(sl)),
+        })
+      }
+
       setLoading(false)
     }
 
@@ -267,6 +323,83 @@ export default function InsightsPage({ onBack }: { onBack: () => void }) {
                   暫無資料
                 </div>
               )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Shared challenges */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '32px 0 16px 0' }}>
+        <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>共同挑戰</h2>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {([
+            { key: 'both', label: '全部' },
+            { key: 'yumin', label: '玉米', color: '#FF8B4D' },
+            { key: 'sangyuan', label: '三元', color: '#45D4C4' },
+          ] as { key: ChallengeView; label: string; color?: string }[]).map(btn => {
+            const isActive = challengeView === btn.key
+            const activeColor = btn.color ?? '#FFFFFF'
+            return (
+              <button
+                key={btn.key}
+                onClick={() => setChallengeView(btn.key)}
+                style={{
+                  border: `1.5px solid ${isActive ? activeColor : '#404152'}`,
+                  borderRadius: '20px',
+                  padding: '4px 12px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  background: isActive ? `${activeColor}22` : 'transparent',
+                  color: isActive ? activeColor : '#6B7280',
+                  transition: 'all 0.15s ease',
+                }}
+              >{btn.label}</button>
+            )
+          })}
+        </div>
+      </div>
+      <div style={{
+        backgroundColor: '#2A2B3D', borderRadius: '20px',
+        padding: '20px', border: '1px solid #404152',
+      }}>
+        {loading ? (
+          <div style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '16px 0' }}>載入中...</div>
+        ) : challengeStats[challengeView].length === 0 ? (
+          <div style={{ color: '#6B7280', fontSize: '14px', textAlign: 'center', padding: '16px 0' }}>暫無資料</div>
+        ) : challengeStats[challengeView].map((c, i) => {
+          const isBoth = challengeView === 'both'
+          const solidColor = { yumin: '#FF8B4D', sangyuan: '#45D4C4' }[challengeView as 'yumin' | 'sangyuan']
+          const list = challengeStats[challengeView]
+          return (
+            <div key={c.label} style={{ marginBottom: i < list.length - 1 ? '24px' : 0 }}>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px',
+              }}>
+                <span style={{ fontSize: '17px', fontWeight: 700 }}>{c.label}</span>
+                <span>
+                  <span style={{ fontSize: '20px', fontWeight: 800 }}>{c.pct}%</span>
+                  <span style={{ fontSize: '13px', color: '#9CA3AF', marginLeft: '6px' }}>
+                    ({c.count}/{c.total}天)
+                  </span>
+                </span>
+              </div>
+              <div style={{
+                height: '8px', backgroundColor: '#404152', borderRadius: '4px', overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%', width: `${c.pct}%`,
+                  ...(isBoth && c.pct > 0
+                    ? {
+                        background: 'linear-gradient(to right, #FF8B4D, #45D4C4)',
+                        backgroundSize: `${(10000 / c.pct).toFixed(1)}% 100%`,
+                        backgroundPosition: 'left center',
+                      }
+                    : { background: solidColor ?? '#FF8B4D' }),
+                  borderRadius: '4px', transition: 'width 0.6s ease',
+                }} />
+              </div>
             </div>
           )
         })}
