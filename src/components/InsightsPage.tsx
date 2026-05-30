@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, differenceInCalendarDays, parseISO } from 'date-fns'
+import { format, startOfMonth, endOfMonth, subMonths, subDays, differenceInCalendarDays, parseISO } from 'date-fns'
 
 const SCORE_EMOJIS = [
   { score: 1, emoji: '😵' },
@@ -25,11 +25,23 @@ const USER_CONFIG = {
   },
 }
 
-type PeriodKey = 'this_month' | 'last_month' | 'last_3_months' | 'this_year'
+type PeriodKey = 'last_7_days' | 'last_14_days' | 'this_month' | 'last_month' | 'all_time'
 
 function getPeriodRange(period: PeriodKey): { start: string; end: string; label: string } {
   const today = new Date()
   switch (period) {
+    case 'last_7_days':
+      return {
+        start: format(subDays(today, 6), 'yyyy-MM-dd'),
+        end: format(today, 'yyyy-MM-dd'),
+        label: '近 1 週',
+      }
+    case 'last_14_days':
+      return {
+        start: format(subDays(today, 13), 'yyyy-MM-dd'),
+        end: format(today, 'yyyy-MM-dd'),
+        label: '近 2 週',
+      }
     case 'this_month': {
       const month = today.getMonth() + 1
       return {
@@ -44,24 +56,15 @@ function getPeriodRange(period: PeriodKey): { start: string; end: string; label:
       return {
         start: format(startOfMonth(last), 'yyyy-MM-dd'),
         end: format(endOfMonth(last), 'yyyy-MM-dd'),
-        label: `上個月（${month}月）`,
+        label: `上月（${month}月）`,
       }
     }
-    case 'last_3_months': {
-      const threeAgo = subMonths(today, 3)
+    case 'all_time':
       return {
-        start: format(startOfMonth(threeAgo), 'yyyy-MM-dd'),
-        end: format(endOfMonth(today), 'yyyy-MM-dd'),
-        label: '最近3個月',
+        start: '2020-01-01',
+        end: format(today, 'yyyy-MM-dd'),
+        label: '截至目前為止',
       }
-    }
-    case 'this_year': {
-      return {
-        start: format(startOfYear(today), 'yyyy-MM-dd'),
-        end: format(endOfYear(today), 'yyyy-MM-dd'),
-        label: `今年（${today.getFullYear()}年）`,
-      }
-    }
   }
 }
 
@@ -110,10 +113,11 @@ function ChevronDownSVG() {
 }
 
 const PERIODS: { key: PeriodKey }[] = [
+  { key: 'last_7_days' },
+  { key: 'last_14_days' },
   { key: 'this_month' },
   { key: 'last_month' },
-  { key: 'last_3_months' },
-  { key: 'this_year' },
+  { key: 'all_time' },
 ]
 
 export default function InsightsPage({ onBack }: { onBack: () => void }) {
