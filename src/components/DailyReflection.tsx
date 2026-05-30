@@ -745,31 +745,31 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
         <InsightsPage onBack={() => setShowInsights(false)} />
       </div>
 
-      <div style={{ textAlign: 'center', marginBottom: '24px', position: 'relative' }}>
-        {/* Insights button */}
-        <button
-          onClick={() => setShowInsights(true)}
-          style={{
-            position: 'absolute', top: 0, right: 0,
-            background: '#2A2B3D', border: '1px solid #404152',
-            borderRadius: '20px', padding: '8px 14px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            color: '#D1D5DB', fontSize: '14px', fontWeight: 600,
-            cursor: 'pointer', fontFamily: 'inherit',
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10" />
-            <line x1="12" y1="20" x2="12" y2="4" />
-            <line x1="6" y1="20" x2="6" y2="14" />
-          </svg>
-          洞察
-        </button>
+      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <button
+            onClick={() => setShowInsights(true)}
+            style={{
+              background: '#2A2B3D', border: '1px solid #404152',
+              borderRadius: '20px', padding: '8px 14px',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              color: '#D1D5DB', fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+            洞察
+          </button>
+        </div>
 
         <h1 style={{
           fontSize: isMobile ? '24px' : '32px', fontWeight: 700,
-          margin: '40px 0 8px 0',
+          margin: '0 0 8px 0',
         }}>今天你們過得好嗎？</h1>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
