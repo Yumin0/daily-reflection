@@ -769,7 +769,7 @@ export default function DailyReflection({ initialUser = 'yumin' }: { initialUser
 
         <h1 style={{
           fontSize: isMobile ? '24px' : '32px', fontWeight: 700,
-          margin: '0 0 8px 0',
+          margin: '40px 0 8px 0',
         }}>今天你們過得好嗎？</h1>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
